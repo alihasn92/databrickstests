@@ -249,6 +249,7 @@ def main():
     logger.info("Top 10 customers:")
     top_customers.show()
     
+    # testing the fuck out of databricks
     # Optional: Save results to Delta table (uncomment when ready)
     # processor.save_to_delta(
     #     kpis_with_trends, 
