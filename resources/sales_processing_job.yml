@@ -1,0 +1,119 @@
+# Sales Processing Job Definition
+# ================================
+# This file defines a Databricks job that runs the sales processing workflow
+
+resources:
+  jobs:
+    sales_processing_job:
+      name: "[${bundle.target}] Knauf Sales Processing"
+      
+      # Job description
+      description: |
+        Daily sales data processing job that:
+        - Loads sales data from Unity Catalog
+        - Calculates monthly KPIs
+        - Generates revenue trends
+        - Identifies top performers
+        
+        This job is part of the Knauf Data Platform 2.0 PoC.
+      
+      # Email notifications
+      email_notifications:
+        on_success:
+          - hassan.ali@knauf.com
+        on_failure:
+          - hassan.ali@knauf.com
+      
+      # Schedule - runs daily at 6 AM
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"
+        timezone_id: "Europe/Berlin"
+        pause_status: PAUSED
+      
+      # Job timeout
+      timeout_seconds: 3600
+      
+      # Maximum concurrent runs
+      max_concurrent_runs: 1
+      
+      # Tasks that make up the job
+      tasks:
+        - task_key: process_sales_data
+          description: "Main sales data processing task"
+          
+          # Use your Python file
+          python_wheel_task:
+            package_name: knauf_sales_analytics
+            entry_point: main
+          
+          # Alternative: Use notebook_task if you prefer
+          # notebook_task:
+          #   notebook_path: ./main.py
+          #   source: GIT
+          
+          # Cluster configuration
+          new_cluster:
+            # Cluster size
+            num_workers: 2
+            
+            # Node types (adjust based on your cloud provider)
+            node_type_id: i3.xlarge  # For AWS
+            # node_type_id: Standard_DS3_v2  # For Azure
+            
+            # Databricks Runtime version
+            spark_version: "14.3.x-scala2.12"
+            
+            # Spark configuration
+            spark_conf:
+              "spark.databricks.delta.preview.enabled": "true"
+              "spark.sql.adaptive.enabled": "true"
+            
+            # Libraries to install
+            libraries:
+              - pypi:
+                  package: pytest
+          
+          # Timeout for this specific task
+          timeout_seconds: 1800
+          
+          # Retry policy
+          max_retries: 2
+          min_retry_interval_millis: 60000
+          retry_on_timeout: false
+        
+        # Optional: Add a second task for data quality checks
+        - task_key: data_quality_check
+          description: "Validate output data quality"
+          depends_on:
+            - task_key: process_sales_data
+          
+          notebook_task:
+            notebook_path: ./notebooks/data_quality_check.py
+            source: GIT
+          
+          # Reuse cluster from previous task
+          existing_cluster_id: ${resources.jobs.sales_processing_job.tasks[0].new_cluster}
+          
+          timeout_seconds: 600
+      
+      # Tags for organization
+      tags:
+        environment: ${bundle.target}
+        project: data_platform_2.0
+        team: data_engineering
+        cost_center: it_analytics
+      
+      # Git source configuration
+      git_source:
+        git_url: https://github.com/your-org/knauf-sales-analytics
+        git_provider: github
+        git_branch: ${bundle.target}
+      
+      # Access control
+      access_control_list:
+        - user_name: hassan.ali@knauf.com
+          permission_level: CAN_MANAGE
+        - group_name: data_engineers
+          permission_level: CAN_MANAGE
+        - group_name: data_analysts
+          permission_level: CAN_VIEW

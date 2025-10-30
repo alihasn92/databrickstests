@@ -1,0 +1,109 @@
+# Databricks Asset Bundle Configuration
+# ======================================
+# This file defines how your project is deployed to Databricks workspaces
+# Author: Hassan Ali
+# Purpose: PoC 1 - CI/CD with Databricks Bundles
+
+bundle:
+  name: knauf_sales_analytics
+
+# Include resource definitions from the resources folder
+include:
+  - resources/*.yml
+
+# Variables that can be reused across the configuration
+variables:
+  warehouse_id:
+    description: SQL Warehouse ID for running queries
+    default: ${var.default_warehouse_id}
+  
+  catalog:
+    description: Unity Catalog name
+    default: main
+  
+  schema:
+    description: Schema name for storing results
+    default: sales_analytics
+
+# Workspace configuration
+workspace:
+  host: ${workspace.host}
+
+# Define different deployment targets (dev, staging, prod)
+targets:
+  # Development target - for individual developer testing
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: ${workspace.host}
+      root_path: ~/.bundle/${bundle.name}/${bundle.target}
+    
+    variables:
+      catalog: dev_catalog
+      schema: ${workspace.current_user.short_name}_sales_analytics
+    
+    # Development-specific settings
+    resources:
+      jobs:
+        sales_processing_job:
+          # In dev, jobs are paused by default
+          schedule:
+            pause_status: PAUSED
+
+  # Staging target - for team testing before production
+  staging:
+    mode: development
+    workspace:
+      host: ${workspace.host}
+      root_path: /Shared/.bundle/${bundle.name}/${bundle.target}
+    
+    variables:
+      catalog: staging_catalog
+      schema: sales_analytics
+    
+    # Use service principal for staging
+    run_as:
+      # Replace with your service principal
+      service_principal_name: staging_sp
+
+  # Production target - for live deployment
+  prod:
+    mode: production
+    workspace:
+      host: ${workspace.host}
+      root_path: /Shared/.bundle/${bundle.name}/${bundle.target}
+    
+    variables:
+      catalog: main
+      schema: sales_analytics
+    
+    # Production settings
+    run_as:
+      # Replace with your production service principal
+      service_principal_name: prod_sp
+    
+    # Production jobs are enabled by default
+    resources:
+      jobs:
+        sales_processing_job:
+          schedule:
+            pause_status: UNPAUSED
+
+# Permissions for the bundle
+permissions:
+  - level: CAN_MANAGE
+    group_name: data_engineers
+  
+  - level: CAN_VIEW
+    group_name: data_analysts
+
+# Artifacts section - for building Python wheels
+artifacts:
+  default:
+    type: whl
+    build: pip wheel -w dist .
+    path: dist/*.whl
+
+# Resources are defined in separate YAML files in the resources/ folder
+# This keeps the main configuration clean and organized
